@@ -12,13 +12,18 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "torch>=2.2,<2.3",         # tested stable with NumPy 1.x
+  "torch>=2.2,<2.3",          # tested stable with NumPy 1.x
   "transformers>=4.40,<4.45", # current stable
-  "datasets>=2.19,<3.0",     # stable Hugging Face Datasets
-  "numpy<2",                 # critical: avoid NumPy 2.x until PyTorch is rebuilt
+  "datasets>=2.19,<3.0",      # stable Hugging Face Datasets
+  "numpy<2",                  # critical: avoid NumPy 2.x until PyTorch is rebuilt
   "tqdm>=4.65",
   "nltk>=3.8",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.pytest.ini_options]
+markers = [
+  "integration: tests that exercise external services or multiple project components",
+]
