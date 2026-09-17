@@ -1,0 +1,6 @@
+download:
+  backend: huggingface
+  dataset_name: wikitext
+  subset_name: wikitext-2-raw-v1
+  text_field: text
+  output_dir: data/raw/test_wikitext2

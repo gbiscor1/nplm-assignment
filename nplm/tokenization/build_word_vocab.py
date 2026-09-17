@@ -6,8 +6,7 @@ import argparse
 import json
 import os
 from typing import Optional
-from .word_tokenizer import WordTokenizer, TokenizerConfig
-
+from nplm.tokenization.word_tokenizer import WordTokenizer, TokenizerConfig
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(

@@ -1,6 +1,7 @@
 # Project-specific directories with large files:
 data/
 runs/
+artifacts/
 
 # Temporary files
 *~
@@ -157,7 +158,7 @@ activemq-data/
 # Environments
 .env
 .envrc
-.venv
+.venv/
 env/
 venv/
 ENV/
