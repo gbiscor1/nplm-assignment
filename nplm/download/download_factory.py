@@ -3,7 +3,7 @@
 Creates dataset downloader implementations based on the configured download backend.
 """
 from nplm.download.huggingface import HuggingFaceDownloader
-from nplm.download.interface import Downloader
+from nplm.download.download_interface import Downloader
 
 
 def create_downloader(backend: str, dataset_name: str, subset_name: str | None = None, text_field: str = "text") -> Downloader:

@@ -7,7 +7,7 @@ from typing import Iterable
 
 from datasets import load_dataset
 
-from nplm.download.interface import Downloader
+from nplm.download.download_interface import Downloader
 from nplm.utils.dataset_formatter import write_jsonl
 
 
