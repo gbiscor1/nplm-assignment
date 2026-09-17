@@ -1,0 +1,16 @@
+download:
+  backend: huggingface
+  dataset_name: wikitext
+  subset_name: wikitext-2-raw-v1
+  text_field: text
+  output_dir: data/raw/wikitext2
+
+preprocessing:
+  input_file: data/raw/wikitext2/raw.jsonl
+  output_dir: data/wikitext2_jsonl
+  lowercase: true
+  seed: 1337
+  train_ratio: 0.8
+  validation_ratio: 0.1
+  test_ratio: 0.1
+  shard_size: 10000

@@ -33,6 +33,11 @@ class Preprocessor:
         Returns:
             list[dict] (list[dict]): records loaded from the raw dataset file.
         """
+        # Safeguard againist empty directory
+        if not input_file.exists():
+            raise FileNotFoundError(f"Raw dataset file was not found: '{input_file}'.")
+
+        # Record container
         records = []
 
         with input_file.open("r", encoding="utf-8") as file:

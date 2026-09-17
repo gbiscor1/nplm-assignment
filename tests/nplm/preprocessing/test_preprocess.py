@@ -80,6 +80,14 @@ def test_read_raw_records_skips_empty_lines(tmp_path):
 
     assert result == [{"text": "Document"}]
 
+def test_read_raw_records_missing_file(tmp_path):
+    """Tests that a missing raw dataset file raises a FileNotFoundError."""
+    input_file = tmp_path / "missing.jsonl"
+    preprocessor = Preprocessor()
+
+    with pytest.raises(FileNotFoundError, match="Raw dataset file was not found"):
+        preprocessor.read_raw_records(input_file)
+
 
 def test_clean_text():
     """Tests that text is stripped and lowercased when configured."""

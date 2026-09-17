@@ -18,6 +18,7 @@ dependencies = [
   "numpy<2",                  # critical: avoid NumPy 2.x until PyTorch is rebuilt
   "tqdm>=4.65",
   "nltk>=3.8",
+  "PyYAML>=6.0",
 ]
 
 [tool.setuptools.packages.find]

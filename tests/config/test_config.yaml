@@ -4,3 +4,13 @@ download:
   subset_name: wikitext-2-raw-v1
   text_field: text
   output_dir: data/raw/test_wikitext2
+
+preprocessing:
+  input_file: data/raw/test_wikitext2/raw.jsonl
+  output_dir: data/test_wikitext2_jsonl
+  lowercase: true
+  seed: 42
+  train_ratio: 0.6
+  validation_ratio: 0.2
+  test_ratio: 0.2
+  shard_size: 2
