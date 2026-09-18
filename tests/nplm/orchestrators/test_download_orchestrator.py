@@ -10,7 +10,7 @@ import pytest
 from nplm.orchestrators.download_orchestrator import DownloadOrchestrator
 
 
-@patch("nplm.orchestrators.download_orchestrator.create_downloader")
+@patch("nplm.orchestrators.download_orchestrator.DownloadFactory.create_downloader")
 def test_run_download(mock_create_downloader):
     """Tests that the orchestrator creates the configured downloader and executes the download."""
     mock_downloader = MagicMock()
@@ -38,7 +38,7 @@ def test_run_download(mock_create_downloader):
     assert result == output_dir
 
 
-@patch("nplm.orchestrators.download_orchestrator.create_downloader")
+@patch("nplm.orchestrators.download_orchestrator.DownloadFactory.create_downloader")
 def test_run_download_factory_failure(mock_create_downloader):
     """Tests that downloader factory failures are propagated by the orchestrator."""
     mock_create_downloader.side_effect = ValueError("Unsupported download backend.")
@@ -53,7 +53,7 @@ def test_run_download_factory_failure(mock_create_downloader):
         )
 
 
-@patch("nplm.orchestrators.download_orchestrator.create_downloader")
+@patch("nplm.orchestrators.download_orchestrator.DownloadFactory.create_downloader")
 def test_run_download_uses_default_optional_values(mock_create_downloader):
     """Tests that the orchestrator passes the expected default optional values to the factory."""
     mock_downloader = MagicMock()

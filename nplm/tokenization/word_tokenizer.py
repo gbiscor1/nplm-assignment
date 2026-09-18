@@ -1,49 +1,20 @@
+# nplm/tokenization/word_tokenizer.py
 """
-word_tokenizer.py
-
-Implements a simple **word-level tokenizer** and vocabulary builder, following
-the approach used in Bengio et al. (2003), *A Neural Probabilistic Language Model*.
-
-Students can use this module to:
-  - Build a word-level vocabulary from a JSONL corpus (one document per line),
-  - Save and load the vocabulary to/from disk,
-  - Tokenize raw text into tokens,
-  - Encode tokens into integer IDs,
-  - Decode IDs back into tokens,
-  - Estimate unknown-token (<unk>) rates on a dataset.
-
-Typical usage inside your training code:
-
-    from nplm.word_tokenizer import WordTokenizer, TokenizerConfig
-
-    # Build from corpus (JSONL directory)
-    config = TokenizerConfig(min_freq=2, max_vocab=20000, lowercase=True)
-    tok = WordTokenizer.build_from_corpus("data/wikitext2_jsonl/train", config)
-
-    # Save vocab
-    tok.save("artifacts/wikitext2_word_vocab.json")
-
-    # Load vocab later
-    tok2 = WordTokenizer.load("artifacts/wikitext2_word_vocab.json")
-
-    # Tokenize + encode a string
-    ids = tok2.encode_text("The quick brown fox jumps over the lazy dog.", with_bos_eos=True)
-
-    # Decode back to tokens
-    tokens = tok2.decode_ids(ids)
-
-This tokenizer is deliberately simple and word-based. You may also implement or
-use a BPE/subword tokenizer (see assignment spec).
+Implements a simple word-level tokenizer and vocabulary builder following the approach used in Bengio et al. (2003), including vocabulary construction, encoding, decoding, persistence, and unknown-token reporting.
 """
 
 from __future__ import annotations
+
+import gzip
 import json
 import os
 import re
-import gzip
-from dataclasses import dataclass, asdict
 from collections import Counter
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Dict, Iterator, List, Optional
+
+from nplm.tokenization.tokenization_interface import Tokenizer
 
 try:
     from tqdm import tqdm
@@ -78,40 +49,44 @@ def _iter_jsonl_paths(jsonl_dir: str) -> Iterator[str]:
 def _open_textmaybe_gzip(path: str):
     if path.endswith(".gz"):
         return gzip.open(path, "rt", encoding="utf-8", errors="ignore")
+
     return open(path, "r", encoding="utf-8", errors="ignore")
 
 
 def iter_text_from_jsonl_dir(jsonl_dir: str, text_field: str = "text") -> Iterator[str]:
     import json as _json
+
     for path in _iter_jsonl_paths(jsonl_dir):
-        with _open_textmaybe_gzip(path) as f:
-            for line in f:
+        with _open_textmaybe_gzip(path) as file:
+            for line in file:
                 line = line.strip()
+
                 if not line:
                     continue
+
                 try:
                     obj = _json.loads(line)
                 except Exception:
                     continue
+
                 if text_field in obj and isinstance(obj[text_field], str):
                     yield obj[text_field]
 
 
-def basic_tokenize(
-    text: str,
-    *,
-    lowercase: bool = False,
-    tokenizer: str = "simple",
-    strip_punct: bool = False,
-) -> List[str]:
+def basic_tokenize(text: str, *, lowercase: bool = False, tokenizer: str = "simple", strip_punct: bool = False) -> List[str]:
     if lowercase:
         text = text.lower()
-    pat = _TOKEN_PATTERNS.get(tokenizer)
-    if pat is None:
+
+    pattern = _TOKEN_PATTERNS.get(tokenizer)
+
+    if pattern is None:
         return text.split()
-    tokens = re.findall(pat, text)
+
+    tokens = re.findall(pattern, text)
+
     if strip_punct:
-        tokens = [t for t in tokens if re.match(r"[A-Za-z0-9_'-]+$", t)]
+        tokens = [token for token in tokens if re.match(r"[A-Za-z0-9_'-]+$", token)]
+
     return tokens
 
 
@@ -120,21 +95,25 @@ class TokenizerConfig:
     min_freq: int = 2
     max_vocab: Optional[int] = 20000
     lowercase: bool = False
-    tokenizer: str = "simple"  # or "whitespace"
+    tokenizer: str = "simple"
     strip_punct: bool = False
     include_bos: bool = True
     include_eos: bool = True
     specials: Optional[List[str]] = None
 
 
-class WordTokenizer:
-    def __init__(
-        self,
-        token_to_id: Dict[str, int],
-        id_to_token: List[str],
-        config: TokenizerConfig,
-        freqs: Optional[Dict[str, int]] = None,
-    ):
+class WordTokenizer(Tokenizer):
+    """
+    Class WordTokenizer: word-level tokenizer implementation with vocabulary construction, encoding, decoding, persistence, and unknown-token reporting.
+
+    Internal parameters:
+        token_to_id (Dict[str, int]): mapping from tokens to integer IDs.
+        id_to_token (List[str]): ordered mapping from integer IDs to tokens.
+        config (TokenizerConfig): configuration controlling vocabulary and tokenization behavior.
+        freqs (Optional[Dict[str, int]]): optional token frequency counts from the training corpus.
+    """
+
+    def __init__(self, token_to_id: Dict[str, int], id_to_token: List[str], config: TokenizerConfig, freqs: Optional[Dict[str, int]] = None):
         self.token_to_id = token_to_id
         self.id_to_token = id_to_token
         self.config = config
@@ -145,15 +124,8 @@ class WordTokenizer:
         self.bos_id = self.token_to_id.get(BOS) if config.include_bos else None
         self.eos_id = self.token_to_id.get(EOS) if config.include_eos else None
 
-    # ---- Factory ----
     @classmethod
-    def build_from_corpus(
-        cls,
-        jsonl_dir: str,
-        config: Optional[TokenizerConfig] = None,
-        text_field: str = "text",
-        progress: bool = True,
-    ) -> "WordTokenizer":
+    def build_from_corpus(cls, jsonl_dir: str, config: Optional[TokenizerConfig] = None, text_field: str = "text", progress: bool = True) -> "WordTokenizer":
         config = config or TokenizerConfig()
         specials = config.specials or DEFAULT_SPECIALS
 
@@ -161,68 +133,107 @@ class WordTokenizer:
         texts = iter_text_from_jsonl_dir(jsonl_dir, text_field=text_field)
         iterator = tqdm(texts, desc="Scanning text", unit="doc") if progress else texts
 
-        for doc in iterator:
-            toks = basic_tokenize(
-                doc,
-                lowercase=config.lowercase,
-                tokenizer=config.tokenizer,
-                strip_punct=config.strip_punct,
-            )
-            counter.update(toks)
+        for document in iterator:
+            tokens = basic_tokenize(document, lowercase=config.lowercase, tokenizer=config.tokenizer, strip_punct=config.strip_punct)
+            counter.update(tokens)
 
-        items = sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))
-        base_vocab: List[str] = [tok for tok, c in items if c >= config.min_freq]
+        items = sorted(counter.items(), key=lambda item: (-item[1], item[0]))
+        base_vocab: List[str] = [token for token, count in items if count >= config.min_freq]
+
         if config.max_vocab is not None and config.max_vocab > 0:
-            base_vocab = base_vocab[: max(0, config.max_vocab)]
+            base_vocab = base_vocab[:max(0, config.max_vocab)]
 
         final_tokens: List[str] = []
-        for s in specials:
-            if s not in final_tokens:
-                final_tokens.append(s)
-        for tok in base_vocab:
-            if tok not in final_tokens:
-                final_tokens.append(tok)
 
-        token_to_id = {tok: i for i, tok in enumerate(final_tokens)}
+        for special in specials:
+            if special not in final_tokens:
+                final_tokens.append(special)
+
+        for token in base_vocab:
+            if token not in final_tokens:
+                final_tokens.append(token)
+
+        token_to_id = {token: index for index, token in enumerate(final_tokens)}
         id_to_token = final_tokens
 
-        return cls(
-            token_to_id=token_to_id,
-            id_to_token=id_to_token,
-            config=config,
-            freqs=dict(counter),
-        )
+        return cls(token_to_id=token_to_id, id_to_token=id_to_token, config=config, freqs=dict(counter))
 
-    # ---- I/O ----
-    def save(self, path: str) -> None:
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    def save(self, output_path: Path) -> Path:
+        """
+        save: saves the tokenizer vocabulary, configuration, and token frequencies to disk.
+
+        Params:
+            output_path (Path): destination path for the tokenizer artifact.
+
+        Returns:
+            Path (Path): path to the saved tokenizer artifact.
+        """
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         payload = {
             "token_to_id": self.token_to_id,
             "id_to_token": self.id_to_token,
             "config": asdict(self.config),
             "freqs": self.freqs,
         }
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+        with output_path.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, ensure_ascii=False, indent=2)
+
+        return output_path
 
     @classmethod
-    def load(cls, path: str) -> "WordTokenizer":
-        with open(path, "r", encoding="utf-8") as f:
-            obj = json.load(f)
-        cfg = TokenizerConfig(**obj["config"])
+    def load(cls, input_path: Path) -> "WordTokenizer":
+        """
+        load: loads a saved word tokenizer artifact from disk.
+
+        Params:
+            input_path (Path): path to the saved tokenizer artifact.
+
+        Returns:
+            WordTokenizer (WordTokenizer): loaded word tokenizer instance.
+        """
+        with input_path.open("r", encoding="utf-8") as file:
+            obj = json.load(file)
+
+        config = TokenizerConfig(**obj["config"])
+
         return cls(
             token_to_id=obj["token_to_id"],
             id_to_token=obj["id_to_token"],
-            config=cfg,
+            config=config,
             freqs=obj.get("freqs", {}),
         )
 
-    # ---- Encode/Decode ----
+    def encode(self, text: str) -> list[int]:
+        """
+        encode: converts text into token IDs using the configured word-level tokenizer.
+
+        Params:
+            text (str): text to tokenize and encode.
+
+        Returns:
+            list[int] (list[int]): encoded token IDs.
+        """
+        return self.encode_text(text)
+
+    def decode(self, token_ids: list[int]) -> str:
+        """
+        decode: converts token IDs back into a space-separated text representation.
+
+        Params:
+            token_ids (list[int]): token IDs to decode.
+
+        Returns:
+            str (str): decoded text.
+        """
+        return " ".join(self.decode_ids(token_ids))
+
     def encode_tokens(self, tokens: List[str]) -> List[int]:
-        return [self.token_to_id.get(t, self.unk_id) for t in tokens]
+        return [self.token_to_id.get(token, self.unk_id) for token in tokens]
 
     def decode_ids(self, ids: List[int]) -> List[str]:
-        return [self.id_to_token[i] if 0 <= i < len(self.id_to_token) else UNK for i in ids]
+        return [self.id_to_token[token_id] if 0 <= token_id < len(self.id_to_token) else UNK for token_id in ids]
 
     def tokenize(self, text: str) -> List[str]:
         return basic_tokenize(
@@ -233,19 +244,20 @@ class WordTokenizer:
         )
 
     def encode_text(self, text: str, with_bos_eos: bool = False) -> List[int]:
-        toks = self.tokenize(text)
-        if with_bos_eos:
-            toks = ([BOS] if self.config.include_bos else []) + toks + (
-                [EOS] if self.config.include_eos else []
-            )
-        return self.encode_tokens(toks)
+        tokens = self.tokenize(text)
 
-    # ---- Reporting ----
+        if with_bos_eos:
+            tokens = ([BOS] if self.config.include_bos else []) + tokens + ([EOS] if self.config.include_eos else [])
+
+        return self.encode_tokens(tokens)
+
     def unk_rate_on_dir(self, jsonl_dir: str, text_field: str = "text") -> float:
         total = 0
-        unk = 0
-        for doc in iter_text_from_jsonl_dir(jsonl_dir, text_field=text_field):
-            toks = self.tokenize(doc)
-            total += len(toks)
-            unk += sum(1 for t in toks if t not in self.token_to_id)
-        return (unk / total) if total > 0 else 0.0
+        unknown = 0
+
+        for document in iter_text_from_jsonl_dir(jsonl_dir, text_field=text_field):
+            tokens = self.tokenize(document)
+            total += len(tokens)
+            unknown += sum(1 for token in tokens if token not in self.token_to_id)
+
+        return (unknown / total) if total > 0 else 0.0

@@ -14,3 +14,20 @@ preprocessing:
   validation_ratio: 0.1
   test_ratio: 0.1
   shard_size: 10000
+
+tokenization:
+  type: word
+  jsonl_dir: data/wikitext2_jsonl/train
+  output_path: artifacts/wikitext2_word_vocab.json
+
+  min_freq: 2
+  max_vocab: 20000
+
+  lowercase: false
+  tokenizer: simple
+  strip_punct: false
+  include_bos: true
+  include_eos: true
+
+  text_field: text
+  progress: true

@@ -4,7 +4,7 @@ Coordinates the dataset download workflow by creating the configured downloader 
 """
 from pathlib import Path
 
-from nplm.download.download_factory import create_downloader
+from nplm.download.download_factory import DownloadFactory
 
 
 class DownloadOrchestrator:
@@ -29,6 +29,11 @@ class DownloadOrchestrator:
         Returns:
             Path (Path): path to the downloaded dataset directory.
         """
-        downloader = create_downloader(backend=backend, dataset_name=dataset_name, subset_name=subset_name, text_field=text_field)
+        downloader = DownloadFactory.create_downloader(
+            backend=backend,
+            dataset_name=dataset_name,
+            subset_name=subset_name,
+            text_field=text_field,
+        )
 
         return downloader.download(output_dir)

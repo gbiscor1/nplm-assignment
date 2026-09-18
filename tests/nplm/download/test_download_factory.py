@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nplm.download.download_factory import create_downloader
+from nplm.download.download_factory import DownloadFactory
 
 
 @patch("nplm.download.download_factory.HuggingFaceDownloader")
@@ -15,7 +15,7 @@ def test_create_huggingface_downloader(mock_huggingface_downloader):
     mock_downloader = MagicMock()
     mock_huggingface_downloader.return_value = mock_downloader
 
-    result = create_downloader(
+    result = DownloadFactory.create_downloader(
         backend="huggingface",
         dataset_name="wikitext",
         subset_name="wikitext-2-raw-v1",
@@ -34,7 +34,7 @@ def test_create_huggingface_downloader(mock_huggingface_downloader):
 def test_create_downloader_unsupported_backend(mock_huggingface_downloader):
     """Tests that an unsupported backend raises a ValueError."""
     with pytest.raises(ValueError, match="Unsupported download backend"):
-        create_downloader(
+        DownloadFactory.create_downloader(
             backend="invalid",
             dataset_name="wikitext",
         )
@@ -48,7 +48,7 @@ def test_create_downloader_normalizes_backend(mock_huggingface_downloader):
     mock_downloader = MagicMock()
     mock_huggingface_downloader.return_value = mock_downloader
 
-    result = create_downloader(
+    result = DownloadFactory.create_downloader(
         backend="  HuggingFace  ",
         dataset_name="wikitext",
         subset_name=None,
